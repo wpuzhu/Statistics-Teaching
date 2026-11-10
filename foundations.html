@@ -1,0 +1,192 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Proportion Test Foundations</title><style>
+:root{--ink:#21323f;--blue:#175777;--teal:#5fa8bf;--red:#b83c48;--orange:#bd761d;--green:#217f68;--purple:#744d8c;--tint:#edf3f5;--line:#dbe0df}
+*{box-sizing:border-box}body{margin:0;background:#f3f1ec;color:var(--ink);font:18px/1.5 'Times New Roman',Times,serif}
+main{max-width:1140px;margin:28px auto;padding:0 22px 45px}h1{font-size:34px;line-height:1.15;margin:6px 0 12px}h2{font-size:23px;margin:0 0 10px}h3{font-size:19px;margin:12px 0 6px}p{margin:8px 0 14px}
+.eyebrow{font-size:14px;letter-spacing:.09em;color:var(--blue)}.intro{max-width:900px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}button,select,input[type=number]{font:inherit;border:1px solid #bac6ca;border-radius:6px;padding:7px 12px;background:#fff;color:var(--ink);cursor:pointer}input[type=number]{width:100%;cursor:text}
+button.active{background:var(--blue);color:#fff;border-color:var(--blue)}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #b47617;outline-offset:3px}
+.layout{display:grid;grid-template-columns:290px 1fr;gap:20px}.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px;min-width:0}
+.control{border-top:1px solid #e1e5e5;padding-top:12px;margin-top:12px}label{display:block;font-weight:bold}input[type=range]{width:100%;accent-color:var(--blue)}
+.value{color:var(--blue);font-weight:bold}.small{font-size:15px;color:#475963}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.metric{background:#f2f5f5;border-radius:7px;padding:10px;font-size:14px}.metric strong{display:block;font-size:23px;font-weight:normal}
+.note{border-left:4px solid var(--blue);padding:9px 14px;background:var(--tint)}.warn{color:#8a4612;background:#fff4e3;padding:10px;border-radius:6px}.ok{color:var(--green)}.bad{color:var(--red)}
+svg{display:block;width:100%;height:auto;background:#fff}svg text{font-family:'Times New Roman',Times,serif}
+.legend{font-size:15px;display:flex;gap:15px;flex-wrap:wrap}.dot{display:inline-block;width:11px;height:11px;margin-right:4px;vertical-align:middle}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.presets button{padding:5px 9px;font-size:15px}
+.task{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}details{margin-top:8px}summary{cursor:pointer;font-weight:bold;color:var(--blue)}
+table{border-collapse:collapse;width:100%;font-size:16px}th,td{border:1px solid var(--line);padding:6px 8px;text-align:left}th{background:var(--tint)}
+select{max-width:100%}[hidden]{display:none!important}
+@media(max-width:780px){.layout{grid-template-columns:minmax(0,1fr)}.metrics{grid-template-columns:1fr 1fr}main{padding:0 12px}.panel{padding:14px}h1{font-size:28px}}
+</style></head><body><main>
+<div class="eyebrow">DATASCI 101 · FOUNDATIONS AND EXTENSIONS</div>
+<h1>Where the one-proportion Z-test comes from, and when to trust it</h1>
+<p class="intro"><b>Purpose of this page:</b> the probability foundations <i>behind</i> the z-test. Four views: the <b>binomial model</b> for counts (pre-work), the <b>Central Limit Theorem for a sample mean</b> (pre-work), the CLT applied to <b>sample proportions</b>, which are sample means of 0/1 data (Lecture 1), and the <b>exact binomial test vs. the z-test</b> (Lecture 1, an extension that is not tested). The z-test itself, the influence of each component, and Type I/II errors are explored in the main page, <i>Hypothesis_Testing_Proportion.html</i>.</p>
+<div class="tabs" role="tablist">
+<button class="active" data-tab="binom" aria-pressed="true">1. Binomial model</button>
+<button data-tab="mean" aria-pressed="false">2. CLT: sample mean</button>
+<button data-tab="clt" aria-pressed="false">3. CLT: sample proportion</button>
+<button data-tab="exact" aria-pressed="false">4. Exact vs. Z (extension)</button>
+
+</div>
+
+<!-- 1 BINOMIAL -->
+<section id="tab-binom" class="layout">
+<aside class="panel"><h2>Settings</h2>
+<label for="bn">Sample size n: <span id="bnV" class="value"></span></label><input id="bn" type="range" min="5" max="500" step="1" value="200">
+<div class="control"><label for="bp">Success probability p: <span id="bpV" class="value"></span></label><input id="bp" type="range" min="0.01" max="0.99" step="0.01" value="0.37"></div>
+<div class="control"><label for="bx">Highlight counts ≥ x: <span id="bxV" class="value"></span></label><input id="bx" type="range" min="0" max="200" step="1" value="90"></div>
+<div class="control"><label><input id="bover" type="checkbox" checked> Overlay normal curve</label></div>
+<div class="presets"><button data-bpreset="200,0.37,90">Water</button><button data-bpreset="10,0.37,6">Tiny n</button><button data-bpreset="40,0.02,3">Rare event</button></div>
+</aside>
+<section class="panel"><h2>How many “successes” should we expect?</h2>
+<div class="metrics"><div class="metric">Mean np<strong id="bmean"></strong></div><div class="metric">SD √(np(1−p))<strong id="bsd"></strong></div><div class="metric">Exact P(X ≥ x)<strong id="btail" class="bad"></strong></div><div class="metric">Normal approx.<strong id="bnorm"></strong></div></div>
+<svg id="bchart" viewBox="0 0 820 320" role="img" aria-label="Binomial probability bars with optional normal curve"></svg>
+<div class="legend"><span><i class="dot" style="background:#5fa8bf"></i>P(X = k)</span><span><i class="dot" style="background:#b83c48"></i>k ≥ x (tail)</span><span><i class="dot" style="background:#175777;height:3px"></i>Normal curve with the same mean and SD</span></div>
+<p id="bcheck" class="note"></p>
+<div class="task"><b>Try it.</b> (1) Set the Water preset: how far is 90 from the mean in SDs? (2) Choose “Tiny n”: why does the normal curve fit poorly? (3) Choose “Rare event”: compare the exact tail with the normal approximation.
+<details><summary>Show explanation</summary><p>(1) (90 − 74)/6.83 ≈ 2.34 SDs. (2) With n = 10 the bars are few and skewed; np = 3.7 is below 10. (3) With n = 40, p = 0.02 the mean is 0.8; the distribution is piled against zero and strongly right-skewed, so the normal tail is far too small. That is exactly when the exact test is needed.</p></details></div>
+</section></section>
+
+<!-- 2 CLT -->
+<!-- 2 CLT FOR A SAMPLE MEAN -->
+<section id="tab-mean" class="layout" hidden>
+<aside class="panel"><h2>Settings</h2>
+<label for="mpop">Population</label><select id="mpop"><option value="exp">Right-skewed: wait times (μ = 10 min, σ = 10)</option><option value="unif">Flat: uniform from 0 to 20 (μ = 10, σ = 5.77)</option><option value="bim">Two peaks: mixture (μ = 10, σ = 6.08)</option></select>
+<div class="control"><label for="mn">Sample size n: <span id="mnV" class="value"></span></label><input id="mn" type="range" min="1" max="100" step="1" value="2"></div>
+<div class="control"><h3>Draw samples</h3><div class="presets"><button id="m1">+1</button><button id="m100">+100</button><button id="m1000">+1,000</button><button id="mclr">Clear</button></div>
+<p class="small">Each draw is one study: n independent values from the population, summarized by their mean x̄.</p></div>
+</aside>
+<section class="panel"><h2>The sampling distribution of the sample mean x̄</h2>
+<div class="metrics"><div class="metric">Studies drawn<strong id="mcount">0</strong></div><div class="metric">Mean of x̄<strong id="mmean">—</strong></div><div class="metric">SD of x̄ (simulated)<strong id="msd">—</strong></div><div class="metric">Formula σ/√n<strong id="mse"></strong></div></div>
+<h3>Population (one value at a time)</h3>
+<svg id="mpopchart" viewBox="0 0 820 170" role="img" aria-label="Population distribution"></svg>
+<h3>Simulated sample means, with the normal curve N(μ, σ²/n)</h3>
+<svg id="mchart" viewBox="0 0 820 300" role="img" aria-label="Histogram of simulated sample means with normal curve"></svg>
+<p class="note" id="mlast">Press +1 to run one study.</p>
+<div class="task"><b>Predict → draw → explain.</b> Start with the right-skewed population. Before each run, predict the shape of the histogram of x̄. (1) n = 2, +1,000. (2) n = 30, +1,000. (3) n = 100, +1,000. (4) Repeat with the flat population. What happens to the shape and to the spread as n grows?
+<details><summary>Show explanation</summary><p>For n = 2 the means are still right-skewed, because the population is. By n = 30 the histogram is close to the normal curve, and by n = 100 it is nearly indistinguishable from it: this is the Central Limit Theorem. The centre stays at μ = 10 (x̄ is unbiased), and the spread shrinks like σ/√n: about 7.1 at n = 2, 1.83 at n = 30 and 1.0 at n = 100. A flat population needs an even smaller n to look normal; the more skewed the population, the larger n must be.</p></details></div>
+</section></section>
+
+<!-- 3 CLT FOR A SAMPLE PROPORTION -->
+<section id="tab-clt" class="layout" hidden>
+<aside class="panel"><h2>Settings</h2>
+<label for="cn">Sample size n: <span id="cnV" class="value"></span></label><input id="cn" type="range" min="5" max="500" step="5" value="200">
+<div class="control"><label for="cp">True proportion p: <span id="cpV" class="value"></span></label><input id="cp" type="range" min="0.02" max="0.98" step="0.01" value="0.37"></div>
+<div class="control"><h3>Draw samples</h3><div class="presets"><button id="c1">+1</button><button id="c100">+100</button><button id="c1000">+1,000</button><button id="cclr">Clear</button></div>
+<p class="small">Each draw is one study: n independent readings, summarized by p̂.</p></div>
+</aside>
+<section class="panel"><h2>The sampling distribution of p̂ builds up</h2>
+<p class="small">Lecture 1: code each yes/no reading as 1 or 0. Then p̂ is the sample mean of those 0/1 values, so the CLT from tab 2 applies, with μ = p and σ = √(p(1 − p)).</p>
+<div class="metrics"><div class="metric">Studies drawn<strong id="ccount">0</strong></div><div class="metric">Mean of p̂<strong id="cmean">—</strong></div><div class="metric">SD of p̂ (simulated)<strong id="csd">—</strong></div><div class="metric">Formula √(p(1−p)/n)<strong id="cse"></strong></div></div>
+<svg id="cchart" viewBox="0 0 820 320" role="img" aria-label="Histogram of simulated sample proportions with normal curve"></svg>
+<p class="note" id="clast">Press +1 to run one study.</p>
+<div class="task"><b>Predict → draw → explain.</b> Before each run, predict the shape. (1) n = 10, p = 0.37, +1,000. (2) n = 200, +1,000. (3) n = 200, p = 0.05. When does the histogram match the curve, and what does the simulated SD agree with?
+<details><summary>Show explanation</summary><p>At n = 10 the histogram has few possible values (steps of 0.1) and is lumpy. At n = 200 it is close to the normal curve with SD near √(0.37·0.63/200) = 0.034. With p = 0.05 and n = 200, np = 10, right at the rule-of-thumb boundary; a slight right skew remains. In every case the simulated mean is near p (unbiased) and the simulated SD near the formula.</p></details></div>
+</section></section>
+
+<!-- 4 EXACT VS Z -->
+<section id="tab-exact" class="layout" hidden>
+<aside class="panel"><h2>Data and hypotheses</h2>
+<label for="ex">Successes x</label><input id="ex" type="number" min="0" value="90">
+<div class="control"><label for="en">Sample size n</label><input id="en" type="number" min="1" value="200"></div>
+<div class="control"><label for="ep0">Null proportion p₀</label><input id="ep0" type="number" min="0.001" max="0.999" step="0.01" value="0.37"></div>
+<div class="control"><label for="etail">Alternative</label><select id="etail"><option value="two">p ≠ p₀ (two-sided)</option><option value="greater">p &gt; p₀ (right)</option><option value="less">p &lt; p₀ (left)</option></select></div>
+<div class="control"><label for="ealpha">Significance level α</label><select id="ealpha"><option>0.10</option><option selected>0.05</option><option>0.01</option></select></div>
+<div class="presets"><button data-epreset="90,200,0.37,two">Water</button><button data-epreset="30,100,0.20,greater">Campus</button><button data-epreset="3,40,0.02,greater">Rare event</button><button data-epreset="440,580,0.75,two">Mendel 3:1</button></div>
+</aside>
+<section class="panel"><h2>Same data, two reference distributions</h2>
+<div class="metrics"><div class="metric">z<strong id="ez"></strong></div><div class="metric">Z-test p-value<strong id="ezp"></strong></div><div class="metric">Exact p-value<strong id="eep"></strong></div><div class="metric">Ratio exact / Z<strong id="eratio"></strong></div></div>
+<svg id="echart" viewBox="0 0 820 320" role="img" aria-label="Binomial bars under H0 with exact tail and normal tail"></svg>
+<div class="legend"><span><i class="dot" style="background:#5fa8bf"></i>Binomial(n, p₀) bars</span><span><i class="dot" style="background:#b83c48"></i>Counts in the exact p-value</span><span><i class="dot" style="background:#175777;height:3px"></i>Normal approximation</span><span><i class="dot" style="background:#bd761d;height:3px"></i>Observed x</span></div>
+<p id="edecision" class="note"></p><p id="ewarn" class="warn" hidden></p>
+<p class="small">Exact two-sided p-value: total probability of all counts no more likely than the observed one (the rule used by R’s <code>binom.test</code> and SciPy’s <code>binomtest</code>). The Z-test uses no continuity correction.</p>
+<div class="task"><b>Investigate.</b> (1) Campus at α = 0.01: do the methods agree? (2) Rare event: by what factor does the Z-test understate the p-value? (3) Mendel: both methods fail to reject. Does that prove the 3:1 ratio?
+<details><summary>Show explanation</summary><p>(1) No: Z gives 0.0062 (reject) and exact 0.0112 (fail to reject); α lies between them. (2) About 7 times (0.0065 vs 0.0457): np₀ = 0.8, so the normal curve misrepresents the skewed tail. (3) No. The data are consistent with 3:1, but other ratios close to 0.75 are consistent too; failing to reject is not proof.</p></details></div>
+</section></section>
+
+
+
+<footer class="panel" style="margin-top:20px"><p><b>Author:</b> Puzhu (Chris) Wang · companion to the DATASCI 101 module on the foundations of hypothesis testing and the one-proportion z-test (lectures, Python lab, homework).</p><p class="small"><b>AI use:</b> AI assisted in implementing this page; the author designed the activities, reviewed and revised the content. All examples use invented teaching data.</p></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+// ---------- math ----------
+function erfc(x){const a=Math.abs(x),t=1/(1+0.5*a);const tau=t*Math.exp(-a*a-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+t*(-0.82215223+t*0.17087277)))))))));return x>=0?tau:2-tau;}
+function Phi(z){return 0.5*erfc(-z/Math.SQRT2);}
+const dnorm=(x,m,s)=>Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));
+function lgamma(x){const g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];if(x<0.5)return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);x-=1;let a=c[0];const t=x+g+0.5;for(let i=1;i<9;i++)a+=c[i]/(x+i);return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);}
+function pmf(n,p){const out=new Array(n+1);const lc=lgamma(n+1);for(let k=0;k<=n;k++){out[k]=Math.exp(lc-lgamma(k+1)-lgamma(n-k+1)+k*Math.log(p)+(n-k)*Math.log(1-p));}return out;}
+function exactP(x,n,p0,tail){const f=pmf(n,p0);let s=0;if(tail==='greater'){for(let k=x;k<=n;k++)s+=f[k];}else if(tail==='less'){for(let k=0;k<=x;k++)s+=f[k];}else{const d=f[x]*(1+1e-7);for(let k=0;k<=n;k++)if(f[k]<=d)s+=f[k];}return {p:Math.min(1,s),f};}
+function zP(z,tail){return tail==='greater'?1-Phi(z):tail==='less'?Phi(z):2*Phi(-Math.abs(z));}
+function zcrit(alpha,tail){let lo=0,hi=10,target=tail==='two'?alpha/2:alpha;for(let i=0;i<80;i++){const m=(lo+hi)/2;if(1-Phi(m)>target)lo=m;else hi=m;}return (lo+hi)/2;}
+function power(n,p0,p1,alpha,tail){const se0=Math.sqrt(p0*(1-p0)/n),se1=Math.sqrt(p1*(1-p1)/n),c=zcrit(alpha,tail);
+ if(tail==='greater')return 1-Phi((p0+c*se0-p1)/se1);if(tail==='less')return Phi((p0-c*se0-p1)/se1);
+ return Phi((p0-c*se0-p1)/se1)+1-Phi((p0+c*se0-p1)/se1);}
+const fmt=x=>x===0?'0':x<0.0001?x.toExponential(2):x.toFixed(4);const pct=x=>(100*x).toFixed(1)+'%';
+// ---------- svg helpers ----------
+function frame(svg,W,H,xmin,xmax,ymax,xlab,ticks){const L=55,R=18,T=14,B=48;const X=x=>L+(x-xmin)/(xmax-xmin)*(W-L-R),Y=y=>H-B-y/ymax*(H-B-T);
+ let o=`<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="#44515a"/>`;
+ ticks.forEach(v=>{o+=`<line x1="${X(v)}" x2="${X(v)}" y1="${H-B}" y2="${H-B+5}" stroke="#44515a"/><text x="${X(v)}" y="${H-B+21}" text-anchor="middle" font-size="15">${v}</text>`});
+ o+=`<text x="${(W+L-R)/2}" y="${H-8}" text-anchor="middle" font-size="16">${xlab}</text>`;return {X,Y,o,L,R,T,B};}
+function niceTicks(a,b,k=6){const span=b-a,step0=span/k,mag=Math.pow(10,Math.floor(Math.log10(step0))),st=[1,2,2.5,5,10].map(m=>m*mag).find(s=>span/s<=k+1);const out=[];for(let v=Math.ceil(a/st)*st;v<=b+1e-9;v+=st)out.push(+v.toFixed(6));return out;}
+// ---------- tabs ----------
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(o=>{o.classList.toggle('active',o===b);o.setAttribute('aria-pressed',o===b)});['binom','mean','clt','exact'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);});
+// ---------- 1 binomial ----------
+function rBinom(){const n=+$('bn').value,p=+$('bp').value;$('bx').max=n;let x=Math.min(+$('bx').value,n);$('bx').value=x;
+ $('bnV').textContent=n;$('bpV').textContent=p.toFixed(2);$('bxV').textContent=x;
+ const f=pmf(n,p),m=n*p,sd=Math.sqrt(n*p*(1-p));let tail=0;for(let k=x;k<=n;k++)tail+=f[k];
+ $('bmean').textContent=m.toFixed(2);$('bsd').textContent=sd.toFixed(3);$('btail').textContent=fmt(tail);$('bnorm').textContent=fmt(1-Phi((x-m)/sd));
+ const lo=Math.max(0,Math.floor(m-4.5*sd)),hi=Math.min(n,Math.ceil(m+4.5*sd)),xmin=Math.min(lo,x)-0.5,xmax=Math.max(hi,x)+0.5;
+ const ymax=Math.max(...f.slice(lo,hi+1),dnorm(m,m,sd))*1.12;const fr=frame($('bchart'),820,320,xmin,xmax,ymax,'k = number of successes',niceTicks(xmin+0.5,xmax-0.5));let o=fr.o;
+ const bw=Math.max(1,(fr.X(1)-fr.X(0))*0.85);for(let k=Math.ceil(xmin);k<=Math.floor(xmax);k++){const y=f[k]||0;o+=`<rect x="${fr.X(k)-bw/2}" y="${fr.Y(y)}" width="${bw}" height="${fr.Y(0)-fr.Y(y)}" fill="${k>=x?'#b83c48':'#5fa8bf'}"/>`;}
+ if($('bover').checked){let d='';for(let i=0;i<=400;i++){const v=xmin+(xmax-xmin)*i/400;d+=(i?'L':'M')+fr.X(v).toFixed(1)+','+fr.Y(dnorm(v,m,sd)).toFixed(1);}o+=`<path d="${d}" fill="none" stroke="#175777" stroke-width="2.5"/>`;}
+ $('bchart').innerHTML=o;const a=n*p,b=n*(1-p);$('bcheck').innerHTML=`Large-count check: np = ${a.toFixed(1)}, n(1−p) = ${b.toFixed(1)} → `+(a>=10&&b>=10?'<span class="ok">both ≥ 10; the normal curve is a reasonable approximation.</span>':'<span class="bad">at least one is below 10; expect a poor normal approximation, especially in the tails.</span>')+` Here x is ${((x-m)/sd).toFixed(2)} SDs from the mean.`;}
+['bn','bp','bx','bover'].forEach(id=>$(id).addEventListener('input',rBinom));
+document.querySelectorAll('[data-bpreset]').forEach(b=>b.onclick=()=>{const [n,p,x]=b.dataset.bpreset.split(',');$('bn').value=n;$('bp').value=p;$('bx').max=n;$('bx').value=x;rBinom();});
+// ---------- 2 CLT for a sample mean ----------
+const POP={exp:{mu:10,sd:10,draw:()=>-10*Math.log(1-Math.random()),dens:x=>x<0?0:Math.exp(-x/10)/10,lo:0,hi:50},
+ unif:{mu:10,sd:20/Math.sqrt(12),draw:()=>20*Math.random(),dens:x=>(x>=0&&x<=20)?0.05:0,lo:-2,hi:22},
+ bim:{mu:10,sd:Math.sqrt(37),draw:()=>(Math.random()<0.5?4:16)+Math.sqrt(1)*(()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);})(),dens:x=>0.5*dnorm(x,4,1)+0.5*dnorm(x,16,1),lo:0,hi:20}};
+let msims=[];
+function mdraw(k){const P=POP[$('mpop').value],n=+$('mn').value;let last;for(let i=0;i<k;i++){let s=0;for(let j=0;j<n;j++)s+=P.draw();last=s/n;msims.push(last);}if(last!==undefined)$('mlast').textContent=`Last study: mean of ${n} values = ${last.toFixed(2)}.`;rMean();}
+function rMean(){const P=POP[$('mpop').value],n=+$('mn').value,se=P.sd/Math.sqrt(n);$('mnV').textContent=n;$('mse').textContent=se.toFixed(3);$('mcount').textContent=msims.length.toLocaleString();
+ if(msims.length){const m=msims.reduce((a,b)=>a+b,0)/msims.length;$('mmean').textContent=m.toFixed(3);$('msd').textContent=msims.length>1?Math.sqrt(msims.reduce((a,b)=>a+(b-m)**2,0)/(msims.length-1)).toFixed(3):'—';}else{$('mmean').textContent='—';$('msd').textContent='—';}
+ {let ymax=0;const pts=[];for(let i=0;i<=400;i++){const v=P.lo+(P.hi-P.lo)*i/400,d=P.dens(v);pts.push([v,d]);ymax=Math.max(ymax,d);}const fr=frame($('mpopchart'),820,170,P.lo,P.hi,ymax*1.15,'one value from the population',niceTicks(P.lo,P.hi));let o=fr.o,d='';pts.forEach(([v,y],i)=>{d+=(i?'L':'M')+fr.X(v).toFixed(1)+','+fr.Y(y).toFixed(1);});o+=`<path d="${d} L${fr.X(P.hi)},${fr.Y(0)} L${fr.X(P.lo)},${fr.Y(0)} Z" fill="#edf3f5" stroke="#744d8c" stroke-width="2"/>`;o+=`<line x1="${fr.X(P.mu)}" x2="${fr.X(P.mu)}" y1="${fr.T}" y2="${fr.Y(0)}" stroke="#21323f" stroke-dasharray="4 4"/>`;$('mpopchart').innerHTML=o;}
+ const xmin=Math.max(P.lo,P.mu-4.5*se),xmax=Math.min(P.hi,P.mu+4.5*se);const nb=50,binW=(xmax-xmin)/nb;const counts=new Array(nb).fill(0);
+ msims.forEach(v=>{const i=Math.floor((v-xmin)/binW);if(i>=0&&i<nb)counts[i]++;});const dens=counts.map(c=>msims.length?c/(msims.length*binW):0);
+ const ymax=Math.max(dnorm(P.mu,P.mu,se),...dens)*1.1;const fr=frame($('mchart'),820,300,xmin,xmax,ymax,'x̄ = sample mean',niceTicks(xmin,xmax));let o=fr.o;
+ dens.forEach((d,i)=>{if(d>0)o+=`<rect x="${fr.X(xmin+i*binW)+0.5}" y="${fr.Y(d)}" width="${Math.max(1,fr.X(xmin+(i+1)*binW)-fr.X(xmin+i*binW)-1)}" height="${fr.Y(0)-fr.Y(d)}" fill="#5fa8bf"/>`;});
+ let dp='';for(let i=0;i<=300;i++){const v=xmin+(xmax-xmin)*i/300;dp+=(i?'L':'M')+fr.X(v).toFixed(1)+','+fr.Y(dnorm(v,P.mu,se)).toFixed(1);}o+=`<path d="${dp}" fill="none" stroke="#175777" stroke-width="2.5"/>`;
+ o+=`<line x1="${fr.X(P.mu)}" x2="${fr.X(P.mu)}" y1="${fr.T}" y2="${fr.Y(0)}" stroke="#21323f" stroke-dasharray="4 4"/>`;$('mchart').innerHTML=o;}
+$('m1').onclick=()=>mdraw(1);$('m100').onclick=()=>mdraw(100);$('m1000').onclick=()=>mdraw(1000);$('mclr').onclick=()=>{msims=[];$('mlast').textContent='Cleared. Press +1 to run one study.';rMean();};
+['mn','mpop'].forEach(id=>$(id).addEventListener('input',()=>{msims=[];$('mlast').textContent='Settings changed; simulations cleared.';rMean();}));
+rMean();
+// ---------- 3 CLT for a sample proportion ----------
+let sims=[];function rbin(n,p){let s=0;for(let i=0;i<n;i++)if(Math.random()<p)s++;return s;}
+function draw(k){const n=+$('cn').value,p=+$('cp').value;let last;for(let i=0;i<k;i++){last=rbin(n,p);sims.push(last/n);}if(last!==undefined)$('clast').textContent=`Last study: ${last} successes out of ${n}, p̂ = ${(last/n).toFixed(3)}.`;rCLT();}
+function rCLT(){const n=+$('cn').value,p=+$('cp').value,se=Math.sqrt(p*(1-p)/n);$('cnV').textContent=n;$('cpV').textContent=p.toFixed(2);$('cse').textContent=se.toFixed(4);$('ccount').textContent=sims.length.toLocaleString();
+ if(sims.length){const m=sims.reduce((a,b)=>a+b,0)/sims.length;$('cmean').textContent=m.toFixed(4);$('csd').textContent=sims.length>1?Math.sqrt(sims.reduce((a,b)=>a+(b-m)**2,0)/(sims.length-1)).toFixed(4):'—';}else{$('cmean').textContent='—';$('csd').textContent='—';}
+ const xmin=Math.max(0,p-4.5*se),xmax=Math.min(1,p+4.5*se);const w=1/n;const binW=Math.max(w,(xmax-xmin)/60);const nb=Math.ceil((xmax-xmin)/binW)+2;const start=Math.floor(xmin/binW)*binW;const counts=new Array(nb).fill(0);
+ sims.forEach(v=>{const i=Math.floor((v-start)/binW+1e-9);if(i>=0&&i<nb)counts[i]++;});const dens=counts.map(c=>sims.length?c/(sims.length*binW):0);
+ const ymax=Math.max(dnorm(p,p,se),...dens)*1.1;const fr=frame($('cchart'),820,320,start,start+nb*binW,ymax,'p̂ = sample proportion',niceTicks(start,start+nb*binW));let o=fr.o;
+ dens.forEach((d,i)=>{if(d>0)o+=`<rect x="${fr.X(start+i*binW)+0.5}" y="${fr.Y(d)}" width="${Math.max(1,fr.X(start+(i+1)*binW)-fr.X(start+i*binW)-1)}" height="${fr.Y(0)-fr.Y(d)}" fill="#5fa8bf"/>`;});
+ let dpath='';for(let i=0;i<=300;i++){const v=start+nb*binW*i/300;dpath+=(i?'L':'M')+fr.X(v).toFixed(1)+','+fr.Y(dnorm(v,p,se)).toFixed(1);}o+=`<path d="${dpath}" fill="none" stroke="#175777" stroke-width="2.5"/>`;
+ o+=`<line x1="${fr.X(p)}" x2="${fr.X(p)}" y1="${fr.T}" y2="${fr.Y(0)}" stroke="#21323f" stroke-dasharray="4 4"/>`;$('cchart').innerHTML=o;}
+$('c1').onclick=()=>draw(1);$('c100').onclick=()=>draw(100);$('c1000').onclick=()=>draw(1000);$('cclr').onclick=()=>{sims=[];$('clast').textContent='Cleared. Press +1 to run one study.';rCLT();};
+['cn','cp'].forEach(id=>$(id).addEventListener('input',()=>{sims=[];$('clast').textContent='Settings changed; simulations cleared.';rCLT();}));
+// ---------- 4 exact vs Z ----------
+function rExact(){let n=Math.max(1,Math.round(+$('en').value)),x=Math.min(n,Math.max(0,Math.round(+$('ex').value))),p0=Math.min(.999,Math.max(.001,+$('ep0').value)),tail=$('etail').value,alpha=+$('ealpha').value;
+ const se=Math.sqrt(p0*(1-p0)/n),z=(x/n-p0)/se,zp=zP(z,tail),ex=exactP(x,n,p0,tail);
+ $('ez').textContent=z.toFixed(3);$('ezp').textContent=fmt(zp);$('eep').textContent=fmt(ex.p);$('eratio').textContent=zp>0?(ex.p/zp).toFixed(2):'—';
+ const dz=zp<=alpha,de=ex.p<=alpha;$('edecision').innerHTML=`At α = ${alpha}: exact test <b>${de?'rejects':'fails to reject'}</b>; Z-test <b>${dz?'rejects':'fails to reject'}</b>. `+(dz===de?'<span class="ok">The methods agree.</span>':'<span class="bad">The methods disagree: α lies between the two p-values.</span>');
+ const a=n*p0,b=n*(1-p0);$('ewarn').hidden=a>=10&&b>=10;$('ewarn').textContent=`Expected counts under H₀ are ${a.toFixed(1)} and ${b.toFixed(1)}; at least one is below 10, so the Z-test p-value is unreliable. Report the exact test.`;
+ const f=ex.f,m=n*p0,sd=Math.sqrt(n*p0*(1-p0));const lo=Math.max(0,Math.floor(Math.min(m-4.5*sd,x-1))),hi=Math.min(n,Math.ceil(Math.max(m+4.5*sd,x+1)));
+ const inExact=k=>tail==='greater'?k>=x:tail==='less'?k<=x:f[k]<=f[x]*(1+1e-7);
+ const ymax=Math.max(...f.slice(lo,hi+1),dnorm(m,m,sd))*1.12;const fr=frame($('echart'),820,320,lo-0.5,hi+0.5,ymax,'count k under H₀: Binomial(n, p₀)',niceTicks(lo,hi));let o=fr.o;const bw=Math.max(1,(fr.X(1)-fr.X(0))*0.85);
+ for(let k=lo;k<=hi;k++)o+=`<rect x="${fr.X(k)-bw/2}" y="${fr.Y(f[k])}" width="${bw}" height="${fr.Y(0)-fr.Y(f[k])}" fill="${inExact(k)?'#b83c48':'#5fa8bf'}"/>`;
+ let d='';for(let i=0;i<=400;i++){const v=lo-0.5+(hi-lo+1)*i/400;d+=(i?'L':'M')+fr.X(v).toFixed(1)+','+fr.Y(dnorm(v,m,sd)).toFixed(1);}o+=`<path d="${d}" fill="none" stroke="#175777" stroke-width="2.5"/>`;
+ o+=`<line x1="${fr.X(x)}" x2="${fr.X(x)}" y1="${fr.T}" y2="${fr.Y(0)}" stroke="#bd761d" stroke-width="2.5"/><text x="${fr.X(x)+5}" y="${fr.T+14}" font-size="15" fill="#8a4612">x = ${x}</text>`;$('echart').innerHTML=o;}
+['ex','en','ep0','etail','ealpha'].forEach(id=>$(id).addEventListener('input',rExact));
+document.querySelectorAll('[data-epreset]').forEach(b=>b.onclick=()=>{const [x,n,p0,t]=b.dataset.epreset.split(',');$('ex').value=x;$('en').value=n;$('ep0').value=p0;$('etail').value=t;rExact();});
+rBinom();rCLT();rExact();
+</script></body></html>
