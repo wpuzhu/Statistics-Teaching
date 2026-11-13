@@ -22,7 +22,7 @@
 <div class="control"><label class="check"><input id="showPrev" type="checkbox"> Compare with previous setting</label><div class="small">Light grey = before your last change; colour = now.</div><button id="clearPrev" style="margin-top:8px">Clear previous</button></div><div class="control"><button id="reset">Reset example</button></div></aside>
 <section class="panel"><div id="evidenceView"><h2>How unusual is this sample under the null?</h2><p id="evidenceSummary"></p><div class="metrics"><div class="metric">Observed proportion<strong id="phatMetric"></strong></div><div class="metric">Z-score<strong id="zMetric"></strong></div><div class="metric red">P-value<strong id="pMetric"></strong></div></div><div id="evidenceCompare"></div>
 <svg id="evidenceChart" viewBox="0 0 820 300" role="img" aria-label="Null sampling distribution with the p-value shaded and the cutoffs marked"></svg>
-<p class="prev-legend prevLegend"><span><i class="now-key"></i><b>Now</b></span> &nbsp; <span><i class="prev-key"></i><b>Before</b> (previous setting)</span></p><div class="legend"><span><i class="dot" style="border-top:2px dashed #3a4650;height:0;width:18px;vertical-align:middle"></i>Cutoffs for α (reject H<sub>0</sub> if p̂ lies beyond them)</span><span><i class="dot" style="background:#d9606c;opacity:.75"></i>Shaded tail beyond the observed result: p-value</span></div><p id="decision" class="note" aria-live="polite"></p><p class="small">Dashed lines mark the decision cutoff(s). The red solid line marks the observed proportion. For a two-sided test, the equally distant result on the other side also counts toward the p-value. Each curve shows possible <em>sample proportions</em>, not individual water depths.</p></div>
+<p class="prev-legend prevLegend"><span><i class="now-key"></i><b>Now</b></span> &nbsp; <span><i class="prev-key"></i><b>Before</b> (previous setting)</span></p><div class="legend"><span id="cutKey"><i class="dot" style="border-top:2px dashed #3a4650;height:0;width:18px;vertical-align:middle"></i>Cutoffs for α (reject H<sub>0</sub> if p̂ lies beyond them)</span><span><i class="dot" style="background:#d9606c;opacity:.75"></i>Shaded tail beyond the observed result: p-value</span></div><p id="decision" class="note" aria-live="polite"></p><p class="small">Dashed lines mark the decision cutoff(s). The red solid line marks the observed proportion. For a two-sided test, the equally distant result on the other side also counts toward the p-value. Each curve shows possible <em>sample proportions</em>, not individual water depths.</p></div>
 <div id="errorsView" hidden><h2>What happens when we repeat the study?</h2><p>Read each curve under a different assumed truth. The same decision cutoff(s) apply to both curves.</p><div class="metrics"><div class="metric red">Type I error α<strong id="alphaMetric"></strong></div><div class="metric orange">Type II error β<strong id="betaMetric"></strong></div><div class="metric green">Power: 1 − β<strong id="powerMetric"></strong></div></div><div id="errorsCompare"></div>
 <h3>Null boundary: p = 0.37</h3><svg id="nullChart" viewBox="0 0 820 260" role="img" aria-label="Null sampling distribution; red area is Type I error"></svg>
 <h3 id="alternativeTitle"></h3><svg id="altChart" viewBox="0 0 820 260" role="img" aria-label="Alternative sampling distribution; orange area is Type II error and green is power"></svg>
@@ -71,6 +71,7 @@ return {c,n,p0,p1,tail,se0,se1,phat,z,lo,hi,alpha,beta,power:1-beta,p,valid};}
 function fmt(x){return x<.0001&&x>0?x.toExponential(2):x.toFixed(4);}function pct(x){return (100*x).toFixed(1)+'%';}
 function differs(a,b){return !!a&&!!b&&(a.n!==b.n||a.tail!==b.tail||Math.abs(a.c-b.c)>1e-9||Math.abs(a.phat-b.phat)>1e-9||Math.abs(a.p1-b.p1)>1e-9);}
 function draw(id,s,which,domain,g,st){const svg=$(id),H=which==='evidence'?300:260,W=820,L=58,R=20,top=28,bottom=53;
+const showCut=which!=='evidence'||activeActivity===4||!!(g&&Math.abs(g.alpha-s.alpha)>1e-12);if(which==='evidence'){const ck=document.getElementById('cutKey');if(ck)ck.hidden=!showCut;}
 const mOf=t=>which==='alt'?t.p1:t.p0,sdOf=t=>which==='alt'?t.se1:t.se0;const m=mOf(s),sd=sdOf(s);
 const [xmin,xmax]=domain;let ymax=Math.max(pdf(s.p0,s.p0,s.se0),pdf(s.p1,s.p1,s.se1));if(g)ymax=Math.max(ymax,pdf(g.p0,g.p0,g.se0),pdf(g.p1,g.p1,g.se1));if(st)ymax=Math.max(ymax,pdf(st.p0,st.p0,st.se0),pdf(st.p1,st.p1,st.se1));ymax*=1.13;
 const X=x=>L+(x-xmin)/(xmax-xmin)*(W-L-R),Y=y=>H-bottom-y/ymax*(H-bottom-top);
@@ -86,14 +87,14 @@ const nowCol=which==='alt'?'#744d8c':'#175777';
 let curveMoved=false;
 if(g){const gm=mOf(g),gsd=sdOf(g);curveMoved=Math.abs(gm-m)>1e-9||Math.abs(gsd-sd)>1e-9;const grej=v=>v<=g.lo||v>=g.hi;
  out+='<path d="'+curve(gm,gsd)+'" fill="none" stroke="#a7b1b8" stroke-width="2"/>';
- for(const v of [g.lo,g.hi])if(Number.isFinite(v)&&!(Math.abs(v-s.lo)<1e-9||Math.abs(v-s.hi)<1e-9))out+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+(Y(0)-10)+'" y2="'+(Y(0)+6)+'" stroke="#a7b1b8" stroke-width="2.5"/>';
+ if(showCut)for(const v of [g.lo,g.hi])if(Number.isFinite(v)&&!(Math.abs(v-s.lo)<1e-9||Math.abs(v-s.hi)<1e-9))out+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+(Y(0)-10)+'" y2="'+(Y(0)+6)+'" stroke="#a7b1b8" stroke-width="2.5"/>';
  if(curveMoved){const gpk=Y(pdf(gm,gm,gsd)),npk=Y(pdf(m,m,sd));let gy=gpk-7,ny=npk-7,ga='middle',na='middle',gx=X(gm),nx=X(m);const dx=nx-gx;
   if(Math.abs(dx)<1){if(gpk>npk){ny=npk-8;gy=gpk+18;}else{gy=gpk-8;ny=npk+18;}}
   else if(Math.abs(dx)<240){if(dx>0){ga='end';na='start';gx-=10;nx+=10;}else{ga='start';na='end';gx+=10;nx-=10;}}
   lab(gx,gy,'Before','#8f9aa2',ga);lab(nx,ny,'Now',nowCol,na);}
 }
 out+='<path d="'+path+'" fill="none" stroke="'+nowCol+'" stroke-width="2.5"/>';
-for(const v of [s.lo,s.hi])if(Number.isFinite(v))out+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+top+'" y2="'+Y(0)+'" stroke="#37434a" stroke-width="2" stroke-dasharray="5 5"/>';
+if(showCut)for(const v of [s.lo,s.hi])if(Number.isFinite(v))out+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+top+'" y2="'+Y(0)+'" stroke="#37434a" stroke-width="2" stroke-dasharray="5 5"/>';
 if(which==='evidence'){
  if(g&&Math.abs(g.phat-s.phat)>1e-9){out+='<line x1="'+X(g.phat)+'" x2="'+X(g.phat)+'" y1="'+top+'" y2="'+Y(0)+'" stroke="#a7b1b8" stroke-width="2"/>';lab(X(g.phat),top-8,'Before','#8f9aa2');}
  lab(X(s.phat),top-8,'p̂','#b83c48');
